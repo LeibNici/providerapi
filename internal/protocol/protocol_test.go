@@ -34,3 +34,13 @@ func TestParseReasoningLevel(t *testing.T) {
 		t.Fatal("expected reject")
 	}
 }
+
+func TestMapProviderStatusUpstream500IsGateway502(t *testing.T) {
+	pe := MapProviderStatus(500, "internal error", "internal", "")
+	if pe.HTTPStatus != 502 {
+		t.Fatalf("upstream 500 must map to gateway 502, got %d", pe.HTTPStatus)
+	}
+	if pe.ProviderStatus != 500 {
+		t.Fatalf("ProviderStatus=%d want 500", pe.ProviderStatus)
+	}
+}

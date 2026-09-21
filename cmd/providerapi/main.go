@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
@@ -138,12 +139,105 @@ func printTrace(id string, data map[string]any) {
 	fmt.Printf("  input: %v\n", usage["input_tokens"])
 	fmt.Printf("  output: %v\n", usage["output_tokens"])
 	fmt.Println()
+	printProviderHTTP(data)
 	fmt.Println("Result")
 	if errv, ok := data["error"].(map[string]any); ok && errv != nil {
 		fmt.Printf("  error: %v\n", errv["message"])
 	} else {
 		fmt.Printf("  status: ok\n")
 	}
+}
+
+func printProviderHTTP(data map[string]any) {
+	reqEv, respEv := providerAuditEvents(data)
+	if reqEv != nil {
+		fmt.Println("Provider Request")
+		if method, ok := reqEv["method"]; ok {
+			fmt.Printf("  method: %v\n", method)
+		}
+		if url, ok := reqEv["url"]; ok {
+			fmt.Printf("  url: %v\n", url)
+		}
+		printTraceHeaders(reqEv["headers"])
+		fmt.Println()
+	}
+	if respEv != nil {
+		fmt.Println("Provider Response")
+		if status, ok := respEv["status"]; ok {
+			fmt.Printf("  status: %v\n", status)
+		}
+		printTraceHeaders(respEv["headers"])
+		fmt.Println()
+	}
+}
+
+func providerAuditEvents(data map[string]any) (req, resp map[string]any) {
+	timeline, _ := data["timeline"].([]any)
+	for _, raw := range timeline {
+		ev, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		payload := eventPayload(ev)
+		typ, _ := ev["type"].(string)
+		if typ == "" {
+			typ, _ = payload["type"].(string)
+		}
+		switch typ {
+		case "provider_request":
+			req = payload
+		case "provider_response":
+			resp = payload
+		}
+	}
+	return req, resp
+}
+
+func eventPayload(ev map[string]any) map[string]any {
+	switch p := ev["payload"].(type) {
+	case map[string]any:
+		return p
+	case json.RawMessage:
+		var m map[string]any
+		if json.Unmarshal(p, &m) == nil {
+			return m
+		}
+	case string:
+		var m map[string]any
+		if json.Unmarshal([]byte(p), &m) == nil {
+			return m
+		}
+	}
+	return map[string]any{}
+}
+
+func printTraceHeaders(v any) {
+	headers := headerStringMap(v)
+	if len(headers) == 0 {
+		return
+	}
+	fmt.Println("  headers:")
+	keys := make([]string, 0, len(headers))
+	for k := range headers {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		fmt.Printf("    %s: %s\n", k, headers[k])
+	}
+}
+
+func headerStringMap(v any) map[string]string {
+	out := map[string]string{}
+	switch h := v.(type) {
+	case map[string]string:
+		return h
+	case map[string]any:
+		for k, val := range h {
+			out[k] = fmt.Sprint(val)
+		}
+	}
+	return out
 }
 
 func adminGET(base, token, path string) ([]byte, error) {

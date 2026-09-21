@@ -43,7 +43,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, "--socket is required")
 		os.Exit(1)
 	}
-	c := &Compat{http: &http.Client{Timeout: 10 * time.Minute}}
+	c := &Compat{http: newHTTPClient()}
 	if err := listen(socket, c); err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
 		os.Exit(1)
@@ -110,7 +110,6 @@ func (c *Compat) Complete(ctx context.Context, req *protocol.CompletionRequest) 
 }
 
 func (c *Compat) Stream(ctx context.Context, req *protocol.CompletionRequest) (<-chan protocol.StreamEvent, error) {
-	ch := make(chan protocol.StreamEvent, 32)
 	body, err := c.buildBody(req, true)
 	if err != nil {
 		return nil, err
@@ -119,23 +118,25 @@ func (c *Compat) Stream(ctx context.Context, req *protocol.CompletionRequest) (<
 	if err != nil {
 		return nil, err
 	}
+	c.audit().ProviderRequest(req.RequestID, http.MethodPost, url, headers, body)
+	resp, err := c.http.Do(httpReq)
+	if err != nil {
+		pe := mapTransport(err)
+		c.audit().ProviderStreamEvent(req.RequestID, "provider_error", map[string]any{"message": pe.Message})
+		return nil, pe
+	}
+	if resp.StatusCode >= 400 {
+		raw, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		c.audit().ProviderResponse(req.RequestID, http.MethodPost, url, resp.StatusCode, headerMap(resp.Header), json.RawMessage(trimJSON(raw)))
+		return nil, parseUpstreamError(resp.StatusCode, raw, resp.Header.Get("x-request-id"))
+	}
+	c.audit().ProviderResponse(req.RequestID, http.MethodPost, url, resp.StatusCode, headerMap(resp.Header), nil)
+
+	ch := make(chan protocol.StreamEvent, 32)
 	go func() {
 		defer close(ch)
-		c.audit().ProviderRequest(req.RequestID, http.MethodPost, url, headers, body)
-		resp, err := c.http.Do(httpReq)
-		if err != nil {
-			pe := mapTransport(err)
-			c.audit().ProviderStreamEvent(req.RequestID, "provider_error", map[string]any{"message": pe.Message})
-			ch <- protocol.StreamEvent{Type: protocol.EventError, Error: pe}
-			return
-		}
 		defer resp.Body.Close()
-		if resp.StatusCode >= 400 {
-			raw, _ := io.ReadAll(resp.Body)
-			c.audit().ProviderResponse(req.RequestID, http.MethodPost, url, resp.StatusCode, headerMap(resp.Header), json.RawMessage(trimJSON(raw)))
-			ch <- protocol.StreamEvent{Type: protocol.EventError, Error: parseUpstreamError(resp.StatusCode, raw, resp.Header.Get("x-request-id"))}
-			return
-		}
 		c.audit().ProviderStreamEvent(req.RequestID, "provider_stream_started", map[string]any{"status": resp.StatusCode})
 		ch <- protocol.StreamEvent{Type: protocol.EventStreamStart}
 		first := true
@@ -158,17 +159,17 @@ func (c *Compat) Stream(ctx context.Context, req *protocol.CompletionRequest) (<
 			if data == "[DONE]" {
 				break
 			}
-			ev, f, u, err := parseStreamChunk(data)
+			events, f, u, err := parseStreamChunk(data)
 			if err != nil {
 				ch <- protocol.StreamEvent{Type: protocol.EventError, Error: protocol.NewProviderError(502, "malformed_sse", err.Error())}
 				return
 			}
-			if first && ev != nil && ev.Type == protocol.EventTextDelta {
-				c.audit().ProviderStreamEvent(req.RequestID, "provider_first_event", map[string]any{})
-				first = false
-			}
-			if ev != nil {
-				ch <- *ev
+			for _, ev := range events {
+				if first && ev.Type == protocol.EventTextDelta {
+					c.audit().ProviderStreamEvent(req.RequestID, "provider_first_event", map[string]any{})
+					first = false
+				}
+				ch <- ev
 			}
 			if f != "" {
 				finish = f
@@ -232,14 +233,7 @@ func (c *Compat) buildBody(req *protocol.CompletionRequest, stream bool) (json.R
 	if len(req.Tools) > 0 {
 		tools := make([]any, 0, len(req.Tools))
 		for _, t := range req.Tools {
-			item := map[string]any{"type": t.Type}
-			if t.Function != nil {
-				item["function"] = t.Function
-			}
-			if t.Custom != nil {
-				item["custom"] = t.Custom
-			}
-			tools = append(tools, item)
+			tools = append(tools, t.UpstreamObject())
 		}
 		body["tools"] = tools
 	}
@@ -275,7 +269,7 @@ func (c *Compat) newRequest(ctx context.Context, body json.RawMessage) (*http.Re
 		return nil, "", nil, err
 	}
 	headers := map[string]string{"Content-Type": "application/json"}
-	if key := os.Getenv("OPENAI_COMPAT_API_KEY"); key != "" {
+	if key := bearerToken(); key != "" {
 		headers["Authorization"] = "Bearer " + key
 	}
 	for k, v := range c.cfg.ExtraHeaders {
@@ -327,7 +321,23 @@ func parseCompletion(req *protocol.CompletionRequest, raw []byte) (*protocol.Com
 	return out, nil
 }
 
-func parseStreamChunk(data string) (*protocol.StreamEvent, string, *protocol.Usage, error) {
+func newHTTPClient() *http.Client {
+	return &http.Client{
+		Timeout: 10 * time.Minute,
+		Transport: &http.Transport{
+			ResponseHeaderTimeout: 30 * time.Second,
+		},
+	}
+}
+
+func bearerToken() string {
+	if key := os.Getenv("PROVIDERAPI_CREDENTIAL"); key != "" {
+		return key
+	}
+	return os.Getenv("OPENAI_COMPAT_API_KEY")
+}
+
+func parseStreamChunk(data string) ([]protocol.StreamEvent, string, *protocol.Usage, error) {
 	var env struct {
 		Error *struct {
 			Message string `json:"message"`
@@ -358,7 +368,7 @@ func parseStreamChunk(data string) (*protocol.StreamEvent, string, *protocol.Usa
 		return nil, "", nil, err
 	}
 	if env.Error != nil {
-		return &protocol.StreamEvent{Type: protocol.EventError, Error: protocol.NewProviderError(502, "provider_error", env.Error.Message)}, "", nil, nil
+		return []protocol.StreamEvent{{Type: protocol.EventError, Error: protocol.NewProviderError(502, "provider_error", env.Error.Message)}}, "", nil, nil
 	}
 	var usage *protocol.Usage
 	if env.Usage != nil {
@@ -369,20 +379,24 @@ func parseStreamChunk(data string) (*protocol.StreamEvent, string, *protocol.Usa
 	}
 	ch := env.Choices[0]
 	finish := ch.FinishReason
-	if len(ch.Delta.ToolCalls) > 0 {
-		tc := ch.Delta.ToolCalls[0]
+	var events []protocol.StreamEvent
+	if ch.Delta.Content != nil && *ch.Delta.Content != "" {
+		events = append(events, protocol.StreamEvent{Type: protocol.EventTextDelta, Text: ch.Delta.Content, FinishReason: finish})
+	}
+	for _, tc := range ch.Delta.ToolCalls {
 		typ := protocol.EventToolCallDelta
 		if tc.ID != "" || tc.Function.Name != "" {
 			typ = protocol.EventToolCallStart
 		}
-		return &protocol.StreamEvent{Type: typ, ToolCallDelta: &protocol.ToolCallDelta{
-			Index: tc.Index, ID: tc.ID, Type: tc.Type, Name: tc.Function.Name, Arguments: tc.Function.Arguments,
-		}, FinishReason: finish}, finish, usage, nil
+		events = append(events, protocol.StreamEvent{
+			Type: typ,
+			ToolCallDelta: &protocol.ToolCallDelta{
+				Index: tc.Index, ID: tc.ID, Type: tc.Type, Name: tc.Function.Name, Arguments: tc.Function.Arguments,
+			},
+			FinishReason: finish,
+		})
 	}
-	if ch.Delta.Content != nil && *ch.Delta.Content != "" {
-		return &protocol.StreamEvent{Type: protocol.EventTextDelta, Text: ch.Delta.Content, FinishReason: finish}, finish, usage, nil
-	}
-	return nil, finish, usage, nil
+	return events, finish, usage, nil
 }
 
 func parseUpstreamError(status int, raw []byte, reqID string) *protocol.ProviderError {
