@@ -26,17 +26,47 @@ var (
 	authCaptured  string
 )
 
+type fakeUpstream struct {
+	*httptest.Server
+	mu       sync.Mutex
+	lastBody []byte
+}
+
+func (f *fakeUpstream) LastBody() map[string]any {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	var m map[string]any
+	if len(f.lastBody) == 0 {
+		return m
+	}
+	_ = json.Unmarshal(f.lastBody, &m)
+	return m
+}
+
+func (f *fakeUpstream) LastRaw() []byte {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	out := make([]byte, len(f.lastBody))
+	copy(out, f.lastBody)
+	return out
+}
+
 // fakeOpenAICompatUpstream is an httptest OpenAI-compatible upstream for integration tests.
-func fakeOpenAICompatUpstream() *httptest.Server {
+func fakeOpenAICompatUpstream() *fakeUpstream {
+	f := &fakeUpstream{}
 	var mu sync.Mutex
 	lastAuth := ""
-	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	f.Server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !strings.HasSuffix(r.URL.Path, "/chat/completions") {
 			http.NotFound(w, r)
 			return
 		}
+		raw, _ := io.ReadAll(r.Body)
+		f.mu.Lock()
+		f.lastBody = append([]byte(nil), raw...)
+		f.mu.Unlock()
 		var req map[string]any
-		_ = json.NewDecoder(r.Body).Decode(&req)
+		_ = json.Unmarshal(raw, &req)
 		model, _ := req["model"].(string)
 		mode := r.Header.Get("X-Fake-Mode")
 		if mode == "" {
@@ -179,11 +209,19 @@ func fakeOpenAICompatUpstream() *httptest.Server {
 			}
 			return
 		default:
+			// Named fake-* modes above; OpenRouter-shaped upstream models succeed so
+			// tests can inspect the captured request body.
 			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(400)
-			_ = json.NewEncoder(w).Encode(map[string]any{"error": map[string]any{"message": "unknown fake mode: " + mode}})
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"id": "cmpl-fake", "model": model,
+				"choices": []any{map[string]any{
+					"message": map[string]any{"role": "assistant", "content": "FAKE_OK"},
+					"finish_reason": "stop",
+				}},
+			})
 		}
 	}))
+	return f
 }
 
 func buildOpenAICompat(t *testing.T, dir string) string {
@@ -250,6 +288,33 @@ providers:
     credential: fake-cred
     config:
       base_url: %s
+      reasoning_map:
+        off:
+          reasoning:
+            effort: none
+        low:
+          reasoning:
+            effort: low
+        medium:
+          reasoning:
+            effort: medium
+        high:
+          reasoning:
+            effort: high
+        max:
+          reasoning:
+            effort: max
+        default: {}
+  fake-nomax:
+    plugin: openai-compat
+    credential: fake-cred
+    config:
+      base_url: %s
+      reasoning_map:
+        high:
+          reasoning:
+            effort: high
+        default: {}
 credentials:
   fake-cred:
     provider: fake
@@ -291,7 +356,22 @@ models:
   hanging-headers:
     provider: fake
     upstream_model: hanging-headers
-`, pubPort, admPort, filepath.Join(dir, "db.sqlite"), filepath.Join(dir, "traces"), bin, upstreamURL, credEnvName)
+  sonnet:
+    provider: fake
+    upstream_model: anthropic/claude-sonnet-4.5
+  sonnet-high:
+    provider: fake
+    upstream_model: anthropic/claude-sonnet-4.5
+    reasoning: high
+  sonnet-max:
+    provider: fake
+    upstream_model: anthropic/claude-sonnet-4.5
+    reasoning: max
+  sonnet-max-unmapped:
+    provider: fake-nomax
+    upstream_model: anthropic/claude-sonnet-4.5
+    reasoning: max
+`, pubPort, admPort, filepath.Join(dir, "db.sqlite"), filepath.Join(dir, "traces"), bin, upstreamURL, upstreamURL, credEnvName)
 
 	if err := os.WriteFile(cfgPath, []byte(yaml), 0o600); err != nil {
 		t.Fatal(err)

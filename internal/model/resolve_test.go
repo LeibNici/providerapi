@@ -21,6 +21,13 @@ func TestResolvePriority(t *testing.T) {
 	if got.UpstreamModel != "anthropic/claude-sonnet-4.5" || got.Reasoning != protocol.ReasoningHigh {
 		t.Fatalf("%+v", got)
 	}
+	got, err = Resolve(cfg, "sonnet-high", protocol.ReasoningLow)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Reasoning != protocol.ReasoningLow {
+		t.Fatalf("explicit request must override alias high: %+v", got)
+	}
 	got, err = Resolve(cfg, "sonnet-high", protocol.ReasoningMax)
 	if err != nil {
 		t.Fatal(err)

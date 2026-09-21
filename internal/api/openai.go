@@ -90,6 +90,7 @@ func (p *Public) chatCompletions(w http.ResponseWriter, r *http.Request) {
 		}
 		reqReasoning = lvl
 	}
+	// When both are set, reasoning.effort wins over reasoning_effort.
 	if len(in.Reasoning) > 0 && string(in.Reasoning) != "null" {
 		var rs struct {
 			Effort string `json:"effort"`
