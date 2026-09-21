@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -95,12 +96,7 @@ func (in *Instance) Start(ctx context.Context) error {
 	cmd := exec.Command(in.bin.Command, append(in.bin.Args, "--socket", in.sock)...)
 	cmd.Stdout = io.Discard
 	cmd.Stderr = io.Discard
-	cmd.Env = os.Environ()
-	if in.cred.Env != "" {
-		if v := os.Getenv(in.cred.Env); v != "" {
-			cmd.Env = append(cmd.Env, "OPENAI_COMPAT_API_KEY="+v)
-		}
-	}
+	cmd.Env = pluginEnv(in.cred)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("start plugin %s: %w", in.ID, err)
@@ -457,6 +453,22 @@ func decodeRPCError(err error) error {
 		}
 	}
 	return protocol.AsProviderError(err)
+}
+
+func pluginEnv(cred config.Credential) []string {
+	env := make([]string, 0, len(os.Environ()))
+	for _, e := range os.Environ() {
+		if strings.HasPrefix(e, "PROVIDERAPI_CREDENTIAL=") {
+			continue
+		}
+		env = append(env, e)
+	}
+	if cred.Env != "" {
+		if v := os.Getenv(cred.Env); v != "" {
+			env = append(env, "PROVIDERAPI_CREDENTIAL="+v)
+		}
+	}
+	return env
 }
 
 func mustJSON(v any) json.RawMessage {

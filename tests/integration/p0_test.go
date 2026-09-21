@@ -115,7 +115,7 @@ func TestHTTPStatusMapping(t *testing.T) {
 		{"mock-unauthorized", 401},
 		{"mock-rate-limited", 429},
 		{"mock-unavailable", 503},
-		{"mock-error", 502},
+		{"mock-error", 500},
 	}
 	for _, tc := range cases {
 		body := fmt.Sprintf(`{"model":"%s","messages":[{"role":"user","content":"hi"}]}`, tc.model)

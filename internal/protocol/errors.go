@@ -76,6 +76,8 @@ func MapProviderStatus(status int, message, providerCode, providerReqID string) 
 		httpStatus, code = 404, "not_found"
 	case 429:
 		httpStatus, code = 429, "rate_limited"
+	case 500:
+		httpStatus, code = 500, "internal_error"
 	case 503:
 		httpStatus, code = 503, "unavailable"
 	}

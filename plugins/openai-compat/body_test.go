@@ -36,6 +36,33 @@ func TestBuildBodyReasoningMerge(t *testing.T) {
 	}
 }
 
+func TestBuildBodyToolStrictPreserved(t *testing.T) {
+	c := &Compat{cfg: InstanceConfig{}}
+	raw := json.RawMessage(`{"type":"function","function":{"name":"read_file","parameters":{"type":"object"},"strict":true}}`)
+	var tool protocol.Tool
+	if err := json.Unmarshal(raw, &tool); err != nil {
+		t.Fatal(err)
+	}
+	req := &protocol.CompletionRequest{
+		Model:    "m",
+		Messages: []protocol.Message{{Role: "user", Content: protocol.TextContent("hi")}},
+		Tools:    []protocol.Tool{tool},
+	}
+	bodyRaw, err := c.buildBody(req, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var body map[string]any
+	if err := json.Unmarshal(bodyRaw, &body); err != nil {
+		t.Fatal(err)
+	}
+	tools, _ := body["tools"].([]any)
+	fn, _ := tools[0].(map[string]any)["function"].(map[string]any)
+	if fn["strict"] != true {
+		t.Fatalf("strict not in upstream body: %v", fn)
+	}
+}
+
 func TestBuildBodyMissingReasoningMapping(t *testing.T) {
 	c := &Compat{cfg: InstanceConfig{ReasoningMap: map[string]json.RawMessage{}}}
 	req := &protocol.CompletionRequest{
