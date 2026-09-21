@@ -62,6 +62,24 @@ func fakeOpenAICompatUpstream() *httptest.Server {
 			return
 		case "fake-response-headers":
 			w.Header().Set("X-Generation-Id", "gen-fake-test-123")
+			stream, _ := req["stream"].(bool)
+			if stream {
+				w.Header().Set("Content-Type", "text/event-stream")
+				flusher, ok := w.(http.Flusher)
+				if !ok {
+					http.Error(w, "no flush", 500)
+					return
+				}
+				for _, line := range []string{
+					`data: {"choices":[{"delta":{"content":"OK"}}]}`,
+					`data: {"choices":[{"delta":{},"finish_reason":"stop"}]}`,
+					"data: [DONE]",
+				} {
+					_, _ = w.Write([]byte(line + "\n\n"))
+					flusher.Flush()
+				}
+				return
+			}
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"id": "cmpl-fake", "model": model,
@@ -136,6 +154,23 @@ func fakeOpenAICompatUpstream() *httptest.Server {
 		case "fake-stream-malformed":
 			w.Header().Set("Content-Type", "text/event-stream")
 			_, _ = w.Write([]byte("data: {not-json}\n\n"))
+			return
+		case "fake-stream-response-headers":
+			w.Header().Set("X-Generation-Id", "gen-fake-stream-456")
+			w.Header().Set("Content-Type", "text/event-stream")
+			flusher, ok := w.(http.Flusher)
+			if !ok {
+				http.Error(w, "no flush", 500)
+				return
+			}
+			for _, line := range []string{
+				`data: {"choices":[{"delta":{"content":"ok"}}]}`,
+				`data: {"choices":[{"delta":{},"finish_reason":"stop"}]}`,
+				"data: [DONE]",
+			} {
+				_, _ = w.Write([]byte(line + "\n\n"))
+				flusher.Flush()
+			}
 			return
 		case "hanging-headers":
 			select {
@@ -244,6 +279,9 @@ models:
   fake-stream-malformed:
     provider: fake
     upstream_model: fake-stream-malformed
+  fake-stream-response-headers:
+    provider: fake
+    upstream_model: fake-stream-response-headers
   fake-check-auth:
     provider: fake
     upstream_model: fake-check-auth
@@ -318,7 +356,7 @@ func TestFakeUpstreamStreamHTTPStatus(t *testing.T) {
 		{"fake-404", 404},
 		{"fake-401", 401},
 		{"fake-429", 429},
-		{"fake-500", 500},
+		{"fake-500", 502},
 	}
 	for _, tc := range cases {
 		body := fmt.Sprintf(`{"model":"%s","stream":true,"messages":[{"role":"user","content":"hi"}]}`, tc.model)
@@ -427,6 +465,49 @@ func TestFakeUpstreamProviderAuditHeaders(t *testing.T) {
 	}
 	if strings.Contains(string(traceBody), "gen-fake-test-123") {
 		// generation id value itself is fine in metadata headers summary
+	}
+}
+
+func TestFakeUpstreamStreamProviderAuditHeaders(t *testing.T) {
+	up := fakeOpenAICompatUpstream()
+	defer up.Close()
+	h := startCompatAPI(t, up.URL+"/v1", "FAKE_UPSTREAM_KEY", nil)
+
+	resp := postJSON(t, h.public+"/v1/chat/completions", []byte(`{"model":"fake-stream-response-headers","stream":true,"messages":[{"role":"user","content":"hi"}]}`))
+	reqID := resp.Header.Get("X-Request-ID")
+	if resp.StatusCode != 200 {
+		b, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		t.Fatalf("status %d %s", resp.StatusCode, b)
+	}
+	_, _ = io.ReadAll(resp.Body)
+	resp.Body.Close()
+
+	tr, err := http.Get(h.admin + "/admin/requests/" + reqID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tr.Body.Close()
+	traceBody, _ := io.ReadAll(tr.Body)
+	if !strings.Contains(string(traceBody), "X-Generation-Id") {
+		t.Fatalf("expected X-Generation-Id in stream trace: %s", traceBody)
+	}
+	if !strings.Contains(string(traceBody), "gen-fake-stream-456") {
+		t.Fatalf("expected generation id value in stream trace: %s", traceBody)
+	}
+
+	resp2 := postJSON(t, h.public+"/v1/chat/completions", []byte(`{"model":"fake-response-headers","stream":true,"messages":[{"role":"user","content":"hi"}]}`))
+	reqID2 := resp2.Header.Get("X-Request-ID")
+	_, _ = io.ReadAll(resp2.Body)
+	resp2.Body.Close()
+	tr2, err := http.Get(h.admin + "/admin/requests/" + reqID2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tr2.Body.Close()
+	trace2, _ := io.ReadAll(tr2.Body)
+	if !strings.Contains(string(trace2), "X-Generation-Id") {
+		t.Fatalf("expected X-Generation-Id for stream=true fake-response-headers: %s", trace2)
 	}
 }
 

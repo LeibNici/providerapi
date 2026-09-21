@@ -68,7 +68,7 @@ func TestHTTPStatusRPCRoundTrip(t *testing.T) {
 		{"mock-unauthorized", 401},
 		{"mock-rate-limited", 429},
 		{"mock-unavailable", 503},
-		{"mock-error", 500},
+		{"mock-error", 502},
 	}
 	for _, tc := range cases {
 		_, err := in.Complete(ctx, &protocol.CompletionRequest{
