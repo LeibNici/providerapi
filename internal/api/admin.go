@@ -117,7 +117,7 @@ func (a *Admin) getRequest(w http.ResponseWriter, r *http.Request) {
 		"error": nil,
 	}
 	if row.ErrorMessage != "" {
-		out["error"] = map[string]any{"type": row.ErrorType, "message": row.ErrorMessage}
+		out["error"] = map[string]any{"type": row.ErrorType, "code": row.ErrorCode, "message": row.ErrorMessage}
 	}
 	if len(full) > 0 {
 		var payload any

@@ -94,6 +94,18 @@ models:
   mock-tool:
     provider: mock
     upstream_model: mock-tool
+  mock-unauthorized:
+    provider: mock
+    upstream_model: mock-unauthorized
+  mock-rate-limited:
+    provider: mock
+    upstream_model: mock-rate-limited
+  mock-unavailable:
+    provider: mock
+    upstream_model: mock-unavailable
+  mock-bad-request:
+    provider: mock
+    upstream_model: mock-bad-request
   sonnet-high:
     provider: mock
     upstream_model: mock-echo

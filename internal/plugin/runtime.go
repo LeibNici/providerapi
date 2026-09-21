@@ -154,6 +154,7 @@ func (in *Instance) watch(cmd *exec.Cmd) {
 	if stopped {
 		return
 	}
+	in.failActiveStreams(protocol.PluginCrash(""))
 	time.Sleep(time.Second)
 	in.mu.Lock()
 	if in.stopped {
@@ -181,6 +182,35 @@ func (in *Instance) healthLoop() {
 			in.Healthy = err == nil
 			in.mu.Unlock()
 		}
+	}
+}
+
+func (in *Instance) failActiveStreams(err *protocol.ProviderError) {
+	if err == nil {
+		err = protocol.PluginCrash("")
+	}
+	in.mu.Lock()
+	snapshot := make(map[string]chan protocol.StreamEvent, len(in.streams))
+	for id, ch := range in.streams {
+		snapshot[id] = ch
+		delete(in.streams, id)
+	}
+	in.pending = map[string][]protocol.StreamEvent{}
+	in.mu.Unlock()
+
+	ev := protocol.StreamEvent{Type: protocol.EventError, Error: err}
+	for _, ch := range snapshot {
+		func() {
+			defer func() { _ = recover() }()
+			select {
+			case ch <- ev:
+			default:
+			}
+		}()
+		func() {
+			defer func() { _ = recover() }()
+			close(ch)
+		}()
 	}
 }
 
@@ -313,6 +343,7 @@ func (in *Instance) Stop() {
 	in.stopped = true
 	close(in.stopCh)
 	in.mu.Unlock()
+	in.failActiveStreams(protocol.NewProviderError(499, "plugin_stopped", "plugin stopped"))
 	if in.conn != nil {
 		_ = in.conn.Close()
 	}

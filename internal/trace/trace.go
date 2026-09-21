@@ -112,23 +112,50 @@ func (sess *Session) SetRouting(clientModel, provider, upstream, reasoning, plug
 
 func (sess *Session) ClientRaw(v any) {
 	sess.mu.Lock()
-	sess.payload.ClientRaw = redact.Any(v)
+	level := sess.level
+	if level == LevelFull {
+		sess.payload.ClientRaw = redact.Any(v)
+	} else {
+		sess.payload.ClientRaw = summarizeClientRaw(v)
+	}
 	sess.mu.Unlock()
-	sess.event("client_raw", v)
+	if level == LevelFull {
+		sess.event("client_raw", redact.Any(v))
+	} else {
+		sess.event("client_raw", summarizeClientRaw(v))
+	}
 }
 
 func (sess *Session) Normalized(v any) {
 	sess.mu.Lock()
-	sess.payload.Normalized = redact.Any(v)
+	level := sess.level
+	if level == LevelFull {
+		sess.payload.Normalized = redact.Any(v)
+	} else {
+		sess.payload.Normalized = summarizeCompletionRequest(v)
+	}
 	sess.mu.Unlock()
-	sess.event("normalized", v)
+	if level == LevelFull {
+		sess.event("normalized", redact.Any(v))
+	} else {
+		sess.event("normalized", summarizeCompletionRequest(v))
+	}
 }
 
 func (sess *Session) PluginRequest(v any) {
 	sess.mu.Lock()
-	sess.payload.PluginRequest = redact.Any(v)
+	level := sess.level
+	if level == LevelFull {
+		sess.payload.PluginRequest = redact.Any(v)
+	} else {
+		sess.payload.PluginRequest = summarizeCompletionRequest(v)
+	}
 	sess.mu.Unlock()
-	sess.event("plugin_request", v)
+	if level == LevelFull {
+		sess.event("plugin_request", redact.Any(v))
+	} else {
+		sess.event("plugin_request", summarizeCompletionRequest(v))
+	}
 }
 
 func (sess *Session) ProviderAudit(raw json.RawMessage) {
@@ -137,22 +164,36 @@ func (sess *Session) ProviderAudit(raw json.RawMessage) {
 	_ = json.Unmarshal(redacted, &m)
 	typ, _ := m["type"].(string)
 	sess.mu.Lock()
-	switch typ {
-	case "provider_request":
-		sess.payload.ProviderRequest = m
-	case "provider_response":
-		sess.payload.ProviderResponse = m
+	level := sess.level
+	if level == LevelFull {
+		switch typ {
+		case "provider_request":
+			sess.payload.ProviderRequest = m
+		case "provider_response":
+			sess.payload.ProviderResponse = m
+		}
+	} else {
+		summary := summarizeProviderAudit(m)
+		switch typ {
+		case "provider_request":
+			sess.payload.ProviderRequest = summary
+		case "provider_response":
+			sess.payload.ProviderResponse = summary
+		}
 	}
 	sess.mu.Unlock()
 	if typ == "" {
 		typ = "provider_audit"
 	}
-	if sess.level != LevelFull && (typ == "provider_request" || typ == "provider_response") {
-		// metadata: keep type only
-		sess.event(typ, map[string]any{"type": typ})
+	if level == LevelFull {
+		sess.event(typ, m)
 		return
 	}
-	sess.event(typ, m)
+	if typ == "provider_request" || typ == "provider_response" {
+		sess.event(typ, summarizeProviderAudit(m))
+		return
+	}
+	sess.event(typ, map[string]any{"type": typ})
 }
 
 func (sess *Session) StreamMeta(kind string) {
@@ -189,7 +230,7 @@ func (sess *Session) MarkTTFT(start time.Time) {
 	sess.mu.Unlock()
 }
 
-func (sess *Session) Finish(httpStatus int, status, finish string, inTok, outTok int, errType, errMsg string) {
+func (sess *Session) Finish(httpStatus int, status, finish string, inTok, outTok int, errType, errCode, errMsg string) {
 	sess.mu.Lock()
 	sess.row.FinishedAt = time.Now().UnixMilli()
 	sess.row.DurationMs = int(sess.row.FinishedAt - sess.row.StartedAt)
@@ -199,6 +240,7 @@ func (sess *Session) Finish(httpStatus int, status, finish string, inTok, outTok
 	sess.row.InputTokens = inTok
 	sess.row.OutputTokens = outTok
 	sess.row.ErrorType = errType
+	sess.row.ErrorCode = errCode
 	sess.row.ErrorMessage = errMsg
 	row := sess.row
 	payload := sess.payload
