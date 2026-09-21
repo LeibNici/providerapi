@@ -7,11 +7,11 @@ import (
 	"os"
 	"strings"
 
-	"github.com/chenming/providerapi/internal/config"
-	"github.com/chenming/providerapi/internal/model"
-	"github.com/chenming/providerapi/internal/observability"
-	"github.com/chenming/providerapi/internal/plugin"
-	"github.com/chenming/providerapi/internal/trace"
+	"github.com/LeibNici/providerapi/internal/config"
+	"github.com/LeibNici/providerapi/internal/model"
+	"github.com/LeibNici/providerapi/internal/observability"
+	"github.com/LeibNici/providerapi/internal/plugin"
+	"github.com/LeibNici/providerapi/internal/trace"
 	"github.com/go-chi/chi/v5"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )

@@ -8,7 +8,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/chenming/providerapi/internal/fsutil"
+	"github.com/LeibNici/providerapi/internal/fsutil"
 	_ "modernc.org/sqlite"
 )
 

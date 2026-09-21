@@ -9,9 +9,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/chenming/providerapi/internal/fsutil"
-	"github.com/chenming/providerapi/internal/redact"
-	"github.com/chenming/providerapi/internal/store"
+	"github.com/LeibNici/providerapi/internal/fsutil"
+	"github.com/LeibNici/providerapi/internal/redact"
+	"github.com/LeibNici/providerapi/internal/store"
 )
 
 type Level string

@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/chenming/providerapi/internal/protocol"
-	"github.com/chenming/providerapi/internal/store"
+	"github.com/LeibNici/providerapi/internal/protocol"
+	"github.com/LeibNici/providerapi/internal/store"
 )
 
 const (

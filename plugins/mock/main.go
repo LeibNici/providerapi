@@ -8,8 +8,8 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/chenming/providerapi/internal/protocol"
-	sdkplugin "github.com/chenming/providerapi/sdk/plugin"
+	"github.com/LeibNici/providerapi/internal/protocol"
+	sdkplugin "github.com/LeibNici/providerapi/sdk/plugin"
 )
 
 type Mock struct {

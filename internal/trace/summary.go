@@ -6,8 +6,8 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/chenming/providerapi/internal/protocol"
-	"github.com/chenming/providerapi/internal/redact"
+	"github.com/LeibNici/providerapi/internal/protocol"
+	"github.com/LeibNici/providerapi/internal/redact"
 )
 
 func summarizeClientRaw(v any) map[string]any {

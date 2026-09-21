@@ -10,10 +10,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/chenming/providerapi/internal/idgen"
-	"github.com/chenming/providerapi/internal/jsonrpc"
-	"github.com/chenming/providerapi/internal/protocol"
-	"github.com/chenming/providerapi/internal/redact"
+	"github.com/LeibNici/providerapi/internal/idgen"
+	"github.com/LeibNici/providerapi/internal/jsonrpc"
+	"github.com/LeibNici/providerapi/internal/protocol"
+	"github.com/LeibNici/providerapi/internal/redact"
 )
 
 const ProtocolVersion = "1"

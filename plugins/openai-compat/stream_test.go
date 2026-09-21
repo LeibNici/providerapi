@@ -3,7 +3,7 @@ package main
 import (
 	"testing"
 
-	"github.com/chenming/providerapi/internal/protocol"
+	"github.com/LeibNici/providerapi/internal/protocol"
 )
 
 func TestParseStreamChunkMultiToolAndContent(t *testing.T) {

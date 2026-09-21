@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/chenming/providerapi/internal/app"
+	"github.com/LeibNici/providerapi/internal/app"
 )
 
 func main() {

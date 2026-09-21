@@ -15,8 +15,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/chenming/providerapi/internal/app"
-	"github.com/chenming/providerapi/internal/config"
+	"github.com/LeibNici/providerapi/internal/app"
+	"github.com/LeibNici/providerapi/internal/config"
 	"log/slog"
 )
 

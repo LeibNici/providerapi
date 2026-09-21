@@ -47,7 +47,13 @@ Use model alias `mock` for the in-process mock plugin.
 export OPENROUTER_API_KEY=...
 ```
 
-2. In Cursor, set Base URL to `http://localhost:8317/v1` and pick `sonnet-high`.
+2. In Cursor, set Base URL to `http://localhost:8317/v1` and pick a DeepSeek V4.1 Flash alias (smoke-tested on OpenRouter):
+
+   - `deepseek-v4.1-flash` — default; no `reasoning` field in upstream body
+   - `deepseek-low` — `reasoning.effort: low`
+   - `deepseek-high` — `reasoning.effort: high`
+
+   Upstream slug: `deepseek/deepseek-v4.1-flash`.
 
 3. Inspect a request:
 

@@ -11,13 +11,13 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/chenming/providerapi/internal/api"
-	"github.com/chenming/providerapi/internal/config"
-	"github.com/chenming/providerapi/internal/fsutil"
-	"github.com/chenming/providerapi/internal/observability"
-	"github.com/chenming/providerapi/internal/plugin"
-	"github.com/chenming/providerapi/internal/store"
-	"github.com/chenming/providerapi/internal/trace"
+	"github.com/LeibNici/providerapi/internal/api"
+	"github.com/LeibNici/providerapi/internal/config"
+	"github.com/LeibNici/providerapi/internal/fsutil"
+	"github.com/LeibNici/providerapi/internal/observability"
+	"github.com/LeibNici/providerapi/internal/plugin"
+	"github.com/LeibNici/providerapi/internal/store"
+	"github.com/LeibNici/providerapi/internal/trace"
 )
 
 type App struct {
