@@ -68,13 +68,13 @@ func (p *Public) chatCompletions(w http.ResponseWriter, r *http.Request) {
 	in, extra, err := parseChatRequest(raw)
 	if err != nil {
 		pe := protocol.InvalidRequest(err.Error())
-		sess.Finish(pe.HTTPStatus, "error", "", 0, 0, pe.Type, pe.Message)
+		sess.Finish(pe.HTTPStatus, "error", "", 0, 0, pe.Type, pe.Code, pe.Message)
 		p.writeError(w, reqID, pe, false)
 		return
 	}
 	if in.Model == "" {
 		pe := protocol.InvalidRequest("model is required")
-		sess.Finish(pe.HTTPStatus, "error", "", 0, 0, pe.Type, pe.Message)
+		sess.Finish(pe.HTTPStatus, "error", "", 0, 0, pe.Type, pe.Code, pe.Message)
 		p.writeError(w, reqID, pe, false)
 		return
 	}
@@ -84,7 +84,7 @@ func (p *Public) chatCompletions(w http.ResponseWriter, r *http.Request) {
 		lvl, ok := protocol.ParseReasoningLevel(in.ReasoningEffort)
 		if !ok {
 			pe := protocol.InvalidRequest("invalid reasoning_effort")
-			sess.Finish(pe.HTTPStatus, "error", "", 0, 0, pe.Type, pe.Message)
+			sess.Finish(pe.HTTPStatus, "error", "", 0, 0, pe.Type, pe.Code, pe.Message)
 			p.writeError(w, reqID, pe, false)
 			return
 		}
@@ -98,7 +98,7 @@ func (p *Public) chatCompletions(w http.ResponseWriter, r *http.Request) {
 			lvl, ok := protocol.ParseReasoningLevel(rs.Effort)
 			if !ok {
 				pe := protocol.InvalidRequest("invalid reasoning.effort")
-				sess.Finish(pe.HTTPStatus, "error", "", 0, 0, pe.Type, pe.Message)
+				sess.Finish(pe.HTTPStatus, "error", "", 0, 0, pe.Type, pe.Code, pe.Message)
 				p.writeError(w, reqID, pe, false)
 				return
 			}
@@ -109,7 +109,7 @@ func (p *Public) chatCompletions(w http.ResponseWriter, r *http.Request) {
 	resolved, err := model.Resolve(p.Cfg, in.Model, reqReasoning)
 	if err != nil {
 		pe := protocol.AsProviderError(err)
-		sess.Finish(pe.HTTPStatus, "error", "", 0, 0, pe.Type, pe.Message)
+		sess.Finish(pe.HTTPStatus, "error", "", 0, 0, pe.Type, pe.Code, pe.Message)
 		p.writeError(w, reqID, pe, false)
 		return
 	}
@@ -117,7 +117,7 @@ func (p *Public) chatCompletions(w http.ResponseWriter, r *http.Request) {
 	inst, err := p.Plugins.Get(resolved.Provider)
 	if err != nil {
 		pe := protocol.NewProviderError(502, "plugin_unavailable", err.Error())
-		sess.Finish(pe.HTTPStatus, "error", "", 0, 0, pe.Type, pe.Message)
+		sess.Finish(pe.HTTPStatus, "error", "", 0, 0, pe.Type, pe.Code, pe.Message)
 		p.writeError(w, reqID, pe, false)
 		return
 	}
@@ -158,7 +158,7 @@ func (p *Public) chatCompletions(w http.ResponseWriter, r *http.Request) {
 		p.Metrics.ProviderErrors.WithLabelValues(resolved.Provider, pe.Code).Inc()
 		p.Metrics.RequestsTotal.WithLabelValues(resolved.Provider, resolved.ClientModel, "error").Inc()
 		p.Metrics.RequestDuration.WithLabelValues(resolved.Provider, resolved.ClientModel).Observe(time.Since(start).Seconds())
-		sess.Finish(statusOr(pe, 502), "error", "", 0, 0, pe.Type, pe.Message)
+		sess.Finish(statusOr(pe, 502), "error", "", 0, 0, pe.Type, pe.Code, pe.Message)
 		log.Error("request failed", "error", pe.Message)
 		p.writeError(w, reqID, pe, false)
 		return
@@ -173,7 +173,7 @@ func (p *Public) chatCompletions(w http.ResponseWriter, r *http.Request) {
 	}
 	p.Metrics.RequestsTotal.WithLabelValues(resolved.Provider, resolved.ClientModel, "ok").Inc()
 	p.Metrics.RequestDuration.WithLabelValues(resolved.Provider, resolved.ClientModel).Observe(time.Since(start).Seconds())
-	sess.Finish(200, "ok", resp.FinishReason, inTok, outTok, "", "")
+	sess.Finish(200, "ok", resp.FinishReason, inTok, outTok, "", "", "")
 	log.Info("request completed")
 	writeJSON(w, http.StatusOK, out)
 }
@@ -187,7 +187,7 @@ func (p *Public) handleStream(w http.ResponseWriter, r *http.Request, start time
 		pe := protocol.AsProviderError(err)
 		p.Metrics.ProviderErrors.WithLabelValues(resolved.Provider, pe.Code).Inc()
 		p.Metrics.RequestsTotal.WithLabelValues(resolved.Provider, resolved.ClientModel, "error").Inc()
-		sess.Finish(statusOr(pe, 502), "error", "", 0, 0, pe.Type, pe.Message)
+		sess.Finish(statusOr(pe, 502), "error", "", 0, 0, pe.Type, pe.Code, pe.Message)
 		p.writeError(w, reqID, pe, false)
 		return
 	}
@@ -262,7 +262,7 @@ func (p *Public) handleStream(w http.ResponseWriter, r *http.Request, start time
 			streamErr = true
 			if ev.Error != nil {
 				writeChunk(map[string]any{"error": openaiError(ev.Error)})
-				sess.Finish(statusOr(ev.Error, 502), "error", "stream_error", inTok, outTok, ev.Error.Type, ev.Error.Message)
+				sess.Finish(statusOr(ev.Error, 502), "error", "stream_error", inTok, outTok, ev.Error.Type, ev.Error.Code, ev.Error.Message)
 				p.Metrics.ProviderErrors.WithLabelValues(resolved.Provider, ev.Error.Code).Inc()
 			}
 		case protocol.EventStreamEnd:
@@ -279,7 +279,7 @@ func (p *Public) handleStream(w http.ResponseWriter, r *http.Request, start time
 	}
 
 	if r.Context().Err() != nil {
-		sess.Finish(499, "canceled", "client_disconnect", inTok, outTok, "canceled", "client disconnected")
+		sess.Finish(499, "canceled", "client_disconnect", inTok, outTok, "canceled", "canceled", "client disconnected")
 		log.Info("client disconnected")
 		return
 	}
@@ -302,7 +302,7 @@ func (p *Public) handleStream(w http.ResponseWriter, r *http.Request, start time
 			p.Metrics.OutputTokens.WithLabelValues(resolved.Provider, resolved.ClientModel).Add(float64(outTok))
 		}
 		sess.StreamMeta("stream_finished")
-		sess.Finish(200, "ok", finish, inTok, outTok, "", "")
+		sess.Finish(200, "ok", finish, inTok, outTok, "", "", "")
 		p.Metrics.RequestsTotal.WithLabelValues(resolved.Provider, resolved.ClientModel, "ok").Inc()
 		p.Metrics.RequestDuration.WithLabelValues(resolved.Provider, resolved.ClientModel).Observe(time.Since(start).Seconds())
 		log.Info("request completed")

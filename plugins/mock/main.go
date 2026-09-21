@@ -47,6 +47,10 @@ func (m *Mock) Models(ctx context.Context) ([]protocol.ModelInfo, error) {
 		{ID: "mock-error"},
 		{ID: "mock-timeout"},
 		{ID: "mock-tool"},
+		{ID: "mock-unauthorized"},
+		{ID: "mock-rate-limited"},
+		{ID: "mock-unavailable"},
+		{ID: "mock-bad-request"},
 	}, nil
 }
 
@@ -154,6 +158,14 @@ func simulate(ctx context.Context, req *protocol.CompletionRequest) error {
 	switch req.Model {
 	case "mock-error":
 		return protocol.MapProviderStatus(500, "simulated provider 500", "internal", "")
+	case "mock-unauthorized":
+		return protocol.MapProviderStatus(401, "unauthorized", "unauthorized", "")
+	case "mock-rate-limited":
+		return protocol.MapProviderStatus(429, "rate limited", "rate_limit", "")
+	case "mock-unavailable":
+		return protocol.MapProviderStatus(503, "unavailable", "unavailable", "")
+	case "mock-bad-request":
+		return protocol.MapProviderStatus(400, "bad request", "bad_request", "")
 	case "mock-timeout":
 		select {
 		case <-ctx.Done():

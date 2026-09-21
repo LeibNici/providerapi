@@ -101,8 +101,8 @@ func TestProviderError(t *testing.T) {
 	raw, _ := os.ReadFile(filepath.Join(repoRoot(t), "tests/fixtures/cursor/cursor_provider_error.json"))
 	resp := postJSON(t, public+"/v1/chat/completions", raw)
 	defer resp.Body.Close()
-	if resp.StatusCode < 400 {
-		t.Fatalf("expected error status, got %d", resp.StatusCode)
+	if resp.StatusCode != 502 {
+		t.Fatalf("expected gateway 502 for upstream 500, got %d", resp.StatusCode)
 	}
 	var out map[string]any
 	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {

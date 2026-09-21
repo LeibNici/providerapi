@@ -56,6 +56,7 @@ CREATE TABLE IF NOT EXISTS requests (
   ttft_ms INTEGER,
   duration_ms INTEGER,
   error_type TEXT,
+  error_code TEXT,
   error_message TEXT,
   plugin_id TEXT,
   plugin_version TEXT
@@ -80,6 +81,34 @@ CREATE TABLE IF NOT EXISTS plugins (
 CREATE INDEX IF NOT EXISTS idx_requests_started ON requests(started_at DESC);
 CREATE INDEX IF NOT EXISTS idx_events_req ON request_events(request_id, seq);
 `)
+	if err != nil {
+		return err
+	}
+	if err := s.ensureColumn("requests", "error_code", "TEXT"); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *Store) ensureColumn(table, column, decl string) error {
+	rows, err := s.DB.Query(`PRAGMA table_info(` + table + `)`)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var cid int
+		var name, ctype string
+		var notnull, pk int
+		var dflt sql.NullString
+		if err := rows.Scan(&cid, &name, &ctype, &notnull, &dflt, &pk); err != nil {
+			return err
+		}
+		if name == column {
+			return nil
+		}
+	}
+	_, err = s.DB.Exec(fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s", table, column, decl))
 	return err
 }
 
@@ -100,6 +129,7 @@ type RequestRow struct {
 	TTFTMs          int    `json:"ttft_ms"`
 	DurationMs      int    `json:"duration_ms"`
 	ErrorType       string `json:"error_type"`
+	ErrorCode       string `json:"error_code"`
 	ErrorMessage    string `json:"error_message"`
 	PluginID        string `json:"plugin_id"`
 	PluginVersion   string `json:"plugin_version"`
@@ -110,8 +140,8 @@ func (s *Store) UpsertRequest(ctx context.Context, r RequestRow) error {
 INSERT INTO requests (
   id, client_request_id, started_at, finished_at, client_model, provider, upstream_model,
   reasoning, status, finish_reason, http_status, input_tokens, output_tokens, ttft_ms,
-  duration_ms, error_type, error_message, plugin_id, plugin_version
-) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+  duration_ms, error_type, error_code, error_message, plugin_id, plugin_version
+) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
 ON CONFLICT(id) DO UPDATE SET
   client_request_id=excluded.client_request_id,
   finished_at=excluded.finished_at,
@@ -127,12 +157,13 @@ ON CONFLICT(id) DO UPDATE SET
   ttft_ms=excluded.ttft_ms,
   duration_ms=excluded.duration_ms,
   error_type=excluded.error_type,
+  error_code=excluded.error_code,
   error_message=excluded.error_message,
   plugin_id=excluded.plugin_id,
   plugin_version=excluded.plugin_version
 `, r.ID, r.ClientRequestID, r.StartedAt, nullInt(r.FinishedAt), r.ClientModel, r.Provider, r.UpstreamModel,
 		r.Reasoning, r.Status, r.FinishReason, r.HTTPStatus, r.InputTokens, r.OutputTokens, r.TTFTMs,
-		r.DurationMs, r.ErrorType, r.ErrorMessage, r.PluginID, r.PluginVersion)
+		r.DurationMs, r.ErrorType, r.ErrorCode, r.ErrorMessage, r.PluginID, r.PluginVersion)
 	return err
 }
 
@@ -158,7 +189,7 @@ func (s *Store) ListRequests(ctx context.Context, limit int) ([]RequestRow, erro
 		IFNULL(client_model,''), IFNULL(provider,''), IFNULL(upstream_model,''), IFNULL(reasoning,''),
 		IFNULL(status,''), IFNULL(finish_reason,''), IFNULL(http_status,0), IFNULL(input_tokens,0),
 		IFNULL(output_tokens,0), IFNULL(ttft_ms,0), IFNULL(duration_ms,0), IFNULL(error_type,''),
-		IFNULL(error_message,''), IFNULL(plugin_id,''), IFNULL(plugin_version,'')
+		IFNULL(error_code,''), IFNULL(error_message,''), IFNULL(plugin_id,''), IFNULL(plugin_version,'')
 		FROM requests ORDER BY started_at DESC LIMIT ?`, limit)
 	if err != nil {
 		return nil, err
@@ -169,7 +200,7 @@ func (s *Store) ListRequests(ctx context.Context, limit int) ([]RequestRow, erro
 		var r RequestRow
 		if err := rows.Scan(&r.ID, &r.ClientRequestID, &r.StartedAt, &r.FinishedAt, &r.ClientModel, &r.Provider,
 			&r.UpstreamModel, &r.Reasoning, &r.Status, &r.FinishReason, &r.HTTPStatus, &r.InputTokens,
-			&r.OutputTokens, &r.TTFTMs, &r.DurationMs, &r.ErrorType, &r.ErrorMessage, &r.PluginID, &r.PluginVersion); err != nil {
+			&r.OutputTokens, &r.TTFTMs, &r.DurationMs, &r.ErrorType, &r.ErrorCode, &r.ErrorMessage, &r.PluginID, &r.PluginVersion); err != nil {
 			return nil, err
 		}
 		out = append(out, r)
@@ -183,10 +214,10 @@ func (s *Store) GetRequest(ctx context.Context, id string) (*RequestRow, error) 
 		IFNULL(client_model,''), IFNULL(provider,''), IFNULL(upstream_model,''), IFNULL(reasoning,''),
 		IFNULL(status,''), IFNULL(finish_reason,''), IFNULL(http_status,0), IFNULL(input_tokens,0),
 		IFNULL(output_tokens,0), IFNULL(ttft_ms,0), IFNULL(duration_ms,0), IFNULL(error_type,''),
-		IFNULL(error_message,''), IFNULL(plugin_id,''), IFNULL(plugin_version,'')
+		IFNULL(error_code,''), IFNULL(error_message,''), IFNULL(plugin_id,''), IFNULL(plugin_version,'')
 		FROM requests WHERE id=?`, id).Scan(&r.ID, &r.ClientRequestID, &r.StartedAt, &r.FinishedAt, &r.ClientModel, &r.Provider,
 		&r.UpstreamModel, &r.Reasoning, &r.Status, &r.FinishReason, &r.HTTPStatus, &r.InputTokens,
-		&r.OutputTokens, &r.TTFTMs, &r.DurationMs, &r.ErrorType, &r.ErrorMessage, &r.PluginID, &r.PluginVersion)
+		&r.OutputTokens, &r.TTFTMs, &r.DurationMs, &r.ErrorType, &r.ErrorCode, &r.ErrorMessage, &r.PluginID, &r.PluginVersion)
 	if err == sql.ErrNoRows {
 		return nil, os.ErrNotExist
 	}

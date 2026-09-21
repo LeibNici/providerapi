@@ -7,7 +7,7 @@ type ProviderError struct {
 	Type              string `json:"type"`
 	Code              string `json:"code"`
 	Param             any    `json:"param"`
-	HTTPStatus        int    `json:"-"`
+	HTTPStatus        int    `json:"http_status,omitempty"`
 	ProviderStatus    int    `json:"provider_status,omitempty"`
 	ProviderErrorCode string `json:"provider_error_code,omitempty"`
 	ProviderRequestID string `json:"provider_request_id,omitempty"`
