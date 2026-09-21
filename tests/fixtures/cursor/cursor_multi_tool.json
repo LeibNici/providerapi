@@ -1,0 +1,24 @@
+{
+  "model": "mock-tool",
+  "messages": [
+    {"role": "user", "content": "use tool on two files"}
+  ],
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "read_file",
+        "description": "Read a file",
+        "parameters": {"type": "object", "properties": {"path": {"type": "string"}}}
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "list_dir",
+        "description": "List a directory",
+        "parameters": {"type": "object", "properties": {"path": {"type": "string"}}}
+      }
+    }
+  ]
+}

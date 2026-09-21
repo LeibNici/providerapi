@@ -1,0 +1,7 @@
+{
+  "model": "sonnet-high",
+  "messages": [
+    {"role": "user", "content": "Think carefully."}
+  ],
+  "reasoning_effort": "high"
+}

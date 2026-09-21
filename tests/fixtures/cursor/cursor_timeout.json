@@ -1,0 +1,6 @@
+{
+  "model": "mock-timeout",
+  "messages": [
+    {"role": "user", "content": "this should time out"}
+  ]
+}

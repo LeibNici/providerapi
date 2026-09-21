@@ -1,0 +1,7 @@
+{
+  "model": "mock",
+  "messages": [
+    {"role": "user", "content": "client will disconnect"}
+  ],
+  "stream": true
+}

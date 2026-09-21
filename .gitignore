@@ -1,0 +1,12 @@
+/bin/
+/dist/
+/tmp/
+config.yaml
+*.db
+*.db-shm
+*.db-wal
+.DS_Store
+traces/
+.providerapi/
+/plugins/mock/mock
+/plugins/openai-compat/openai-compat

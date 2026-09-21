@@ -1,0 +1,84 @@
+server:
+  host: 0.0.0.0
+  port: 8317
+
+admin:
+  host: 127.0.0.1
+  port: 8318
+  # token: change-me
+
+storage:
+  sqlite: ~/.providerapi/providerapi.db
+  traces: ~/.providerapi/traces
+
+debug:
+  level: metadata
+  retention: 168h
+  full_retention: 24h
+
+plugins:
+  mock:
+    command: ./plugins/mock/mock
+  openai-compat:
+    command: ./plugins/openai-compat/openai-compat
+
+providers:
+  mock:
+    plugin: mock
+    config: {}
+  openrouter:
+    plugin: openai-compat
+    credential: openrouter-main
+    config:
+      base_url: https://openrouter.ai/api/v1
+      extra_headers:
+        HTTP-Referer: http://localhost:8317
+        X-Title: ProviderApi
+      reasoning_map:
+        off:
+          reasoning:
+            effort: none
+        low:
+          reasoning:
+            effort: low
+        medium:
+          reasoning:
+            effort: medium
+        high:
+          reasoning:
+            effort: high
+        max:
+          reasoning:
+            effort: max
+        default: {}
+
+credentials:
+  openrouter-main:
+    provider: openrouter
+    env: OPENROUTER_API_KEY
+
+models:
+  mock:
+    provider: mock
+    upstream_model: mock-echo
+  mock-error:
+    provider: mock
+    upstream_model: mock-error
+  mock-timeout:
+    provider: mock
+    upstream_model: mock-timeout
+  mock-tool:
+    provider: mock
+    upstream_model: mock-tool
+  sonnet:
+    provider: openrouter
+    upstream_model: anthropic/claude-sonnet-4.5
+    reasoning: default
+  sonnet-high:
+    provider: openrouter
+    upstream_model: anthropic/claude-sonnet-4.5
+    reasoning: high
+  sonnet-max:
+    provider: openrouter
+    upstream_model: anthropic/claude-sonnet-4.5
+    reasoning: max

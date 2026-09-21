@@ -1,0 +1,23 @@
+{
+  "model": "mock-tool",
+  "messages": [
+    {"role": "user", "content": "Read README.md"}
+  ],
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "read_file",
+        "description": "Read a file from disk",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "path": {"type": "string"}
+          },
+          "required": ["path"]
+        }
+      }
+    }
+  ],
+  "tool_choice": "auto"
+}

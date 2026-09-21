@@ -1,0 +1,6 @@
+{
+  "model": "mock-error",
+  "messages": [
+    {"role": "user", "content": "this should 500"}
+  ]
+}

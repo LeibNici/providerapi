@@ -1,0 +1,8 @@
+{
+  "model": "mock",
+  "messages": [
+    {"role": "user", "content": [{"type": "text", "text": "hello"}]}
+  ],
+  "cursor_internal_field": true,
+  "unknown_future_option": {"nested": 1}
+}
