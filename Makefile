@@ -1,6 +1,9 @@
-.PHONY: build test run
+.PHONY: build test run web
 
-build:
+web:
+	cd web && npm ci && npm run build
+
+build: web
 	go build -o bin/providerapi ./cmd/providerapi
 	go build -o plugins/mock/mock ./plugins/mock
 	go build -o plugins/openai-compat/openai-compat ./plugins/openai-compat
