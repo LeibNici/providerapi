@@ -59,6 +59,7 @@ type Instance struct {
 	onTrace    map[string]func(json.RawMessage)
 	stopCh     chan struct{}
 	stopped    bool
+	lastError  string
 	healthOnce sync.Once
 }
 
@@ -141,11 +142,24 @@ func (in *Instance) Start(ctx context.Context) error {
 	return nil
 }
 
+func (in *Instance) LastError() string {
+	in.mu.Lock()
+	defer in.mu.Unlock()
+	return in.lastError
+}
+
 func (in *Instance) watch(cmd *exec.Cmd) {
-	_ = cmd.Wait()
+	waitErr := cmd.Wait()
 	in.mu.Lock()
 	stopped := in.stopped
 	in.Healthy = false
+	if !stopped {
+		msg := "plugin process crashed"
+		if waitErr != nil {
+			msg = waitErr.Error()
+		}
+		in.lastError = msg
+	}
 	in.mu.Unlock()
 	if stopped {
 		return
@@ -337,6 +351,7 @@ func (in *Instance) Stop() {
 		return
 	}
 	in.stopped = true
+	in.lastError = ""
 	close(in.stopCh)
 	in.mu.Unlock()
 	in.failActiveStreams(protocol.NewProviderError(499, "plugin_stopped", "plugin stopped"))

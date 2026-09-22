@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/LeibNici/providerapi/internal/api/console"
 	"github.com/LeibNici/providerapi/internal/config"
 	"github.com/LeibNici/providerapi/internal/model"
 	"github.com/LeibNici/providerapi/internal/observability"
@@ -25,15 +26,18 @@ type Admin struct {
 
 func (a *Admin) Routes() http.Handler {
 	r := chi.NewRouter()
-	r.Use(a.auth)
-	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	r.Group(func(r chi.Router) {
+		r.Use(a.auth)
+		r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
+			writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+		})
+		r.Get("/admin/requests", a.listRequests)
+		r.Get("/admin/requests/{id}", a.getRequest)
+		r.Get("/admin/plugins", a.listPlugins)
+		r.Get("/admin/models", a.listModels)
+		r.Handle("/metrics", promhttp.HandlerFor(a.Metrics.Registry, promhttp.HandlerOpts{}))
 	})
-	r.Get("/admin/requests", a.listRequests)
-	r.Get("/admin/requests/{id}", a.getRequest)
-	r.Get("/admin/plugins", a.listPlugins)
-	r.Get("/admin/models", a.listModels)
-	r.Handle("/metrics", promhttp.HandlerFor(a.Metrics.Registry, promhttp.HandlerOpts{}))
+	r.Mount("/", console.Handler())
 	return r
 }
 
@@ -90,7 +94,9 @@ func (a *Admin) getRequest(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 	out := map[string]any{
-		"request_id": row.ID,
+		"request_id":  row.ID,
+		"http_status": row.HTTPStatus,
+		"started_at":  row.StartedAt,
 		"client": map[string]any{
 			"model":             row.ClientModel,
 			"client_request_id": row.ClientRequestID,
@@ -131,7 +137,7 @@ func (a *Admin) listPlugins(w http.ResponseWriter, r *http.Request) {
 	var data []map[string]any
 	for _, in := range a.Plugins.List() {
 		a.Metrics.PluginHealth.WithLabelValues(in.ID).Set(boolGauge(in.Healthy))
-		data = append(data, map[string]any{
+		row := map[string]any{
 			"instance_id":      in.ID,
 			"plugin":           in.Plugin,
 			"version":          in.Manifest.Version,
@@ -139,13 +145,17 @@ func (a *Admin) listPlugins(w http.ResponseWriter, r *http.Request) {
 			"healthy":          in.Healthy,
 			"pid":              in.PID,
 			"capabilities":     in.Manifest.Capabilities,
-		})
+		}
+		if errMsg := in.LastError(); errMsg != "" {
+			row["last_error"] = errMsg
+		}
+		data = append(data, row)
 	}
 	writeJSON(w, 200, map[string]any{"data": data})
 }
 
 func (a *Admin) listModels(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, 200, map[string]any{"data": model.ListAliases(a.Cfg)})
+	writeJSON(w, 200, map[string]any{"data": model.ListAdminModels(a.Cfg)})
 }
 
 func boolGauge(v bool) float64 {
