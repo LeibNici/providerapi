@@ -68,6 +68,7 @@ type ModelAlias struct {
 	Provider      string `yaml:"provider"`
 	UpstreamModel string `yaml:"upstream_model"`
 	Reasoning     string `yaml:"reasoning"`
+	ContextLength int    `yaml:"context_length"`
 }
 
 func Load(path string) (*Config, error) {

@@ -38,11 +38,16 @@ func Resolve(cfg *config.Config, clientModel string, requestReasoning protocol.R
 
 func ListAliases(cfg *config.Config) []protocol.ModelInfo {
 	out := make([]protocol.ModelInfo, 0, len(cfg.Models))
-	for id := range cfg.Models {
+	for id, alias := range cfg.Models {
+		n := alias.ContextLength
+		if n <= 0 {
+			n = protocol.DefaultContextLength
+		}
 		out = append(out, protocol.ModelInfo{
-			ID:      id,
-			Object:  "model",
-			OwnedBy: "providerapi",
+			ID:            id,
+			Object:        "model",
+			OwnedBy:       "providerapi",
+			ContextLength: n,
 		})
 	}
 	return out

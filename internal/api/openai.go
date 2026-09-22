@@ -289,12 +289,13 @@ func (p *Public) handleStream(w http.ResponseWriter, r *http.Request, start time
 		if finish == "" {
 			finish = "stop"
 		}
-		var usageOut any
+		writeChunk(finalChunk(reqID, resolved.ClientModel, created, finish, nil))
+		// OpenAI stream_options.include_usage: a trailing chunk with empty
+		// choices and a usage object, immediately before data: [DONE].
 		if includeUsage && usage != nil {
-			usageOut = openaiUsage(usage)
+			writeChunk(usageChunk(reqID, resolved.ClientModel, created, openaiUsage(usage)))
 			inTok, outTok = usage.InputTokens, usage.OutputTokens
 		}
-		writeChunk(finalChunk(reqID, resolved.ClientModel, created, finish, usageOut))
 		_, _ = w.Write([]byte("data: [DONE]\n\n"))
 		flusher.Flush()
 		if usage != nil {
@@ -331,6 +332,17 @@ func finalChunk(id, model string, created int64, finish string, usage any) map[s
 		out["usage"] = usage
 	}
 	return out
+}
+
+func usageChunk(id, model string, created int64, usage any) map[string]any {
+	return map[string]any{
+		"id":      id,
+		"object":  "chat.completion.chunk",
+		"created": created,
+		"model":   model,
+		"choices": []any{},
+		"usage":   usage,
+	}
 }
 
 func toolCallDeltaJSON(d *protocol.ToolCallDelta) map[string]any {

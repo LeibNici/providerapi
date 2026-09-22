@@ -71,10 +71,15 @@ type CustomTool struct {
 }
 
 type ModelInfo struct {
-	ID      string `json:"id"`
-	Object  string `json:"object,omitempty"`
-	OwnedBy string `json:"owned_by,omitempty"`
+	ID            string `json:"id"`
+	Object        string `json:"object,omitempty"`
+	OwnedBy       string `json:"owned_by,omitempty"`
+	ContextLength int    `json:"context_length,omitempty"`
 }
+
+// DefaultContextLength is the window advertised when a model alias omits context_length.
+// Matches Cursor's 1M default for unrecognized OpenAI-compatible BYOK models.
+const DefaultContextLength = 1_000_000
 
 type CompletionResponse struct {
 	ID           string  `json:"id"`
