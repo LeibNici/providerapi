@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/chenming/providerapi/internal/protocol"
+	"github.com/LeibNici/providerapi/internal/protocol"
 )
 
 func TestBuildBodyReasoningMerge(t *testing.T) {

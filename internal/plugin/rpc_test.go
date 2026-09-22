@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/chenming/providerapi/internal/config"
-	"github.com/chenming/providerapi/internal/protocol"
+	"github.com/LeibNici/providerapi/internal/config"
+	"github.com/LeibNici/providerapi/internal/protocol"
 )
 
 func repoRoot(t *testing.T) string {

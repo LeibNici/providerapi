@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/chenming/providerapi/internal/config"
+	"github.com/LeibNici/providerapi/internal/config"
 )
 
 func TestPluginEnvReplacesInheritedCredential(t *testing.T) {

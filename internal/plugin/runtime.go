@@ -14,10 +14,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/chenming/providerapi/internal/config"
-	"github.com/chenming/providerapi/internal/jsonrpc"
-	"github.com/chenming/providerapi/internal/protocol"
-	sdkplugin "github.com/chenming/providerapi/sdk/plugin"
+	"github.com/LeibNici/providerapi/internal/config"
+	"github.com/LeibNici/providerapi/internal/jsonrpc"
+	"github.com/LeibNici/providerapi/internal/protocol"
+	sdkplugin "github.com/LeibNici/providerapi/sdk/plugin"
 )
 
 type StreamHandle struct {

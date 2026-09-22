@@ -1,8 +1,8 @@
 package model
 
 import (
-	"github.com/chenming/providerapi/internal/config"
-	"github.com/chenming/providerapi/internal/protocol"
+	"github.com/LeibNici/providerapi/internal/config"
+	"github.com/LeibNici/providerapi/internal/protocol"
 )
 
 type Resolved struct {

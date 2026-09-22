@@ -1,4 +1,4 @@
-module github.com/chenming/providerapi
+module github.com/LeibNici/providerapi
 
 go 1.27.1
 

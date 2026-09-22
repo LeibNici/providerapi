@@ -82,3 +82,15 @@ models:
     provider: openrouter
     upstream_model: anthropic/claude-sonnet-4.5
     reasoning: max
+  deepseek-v4.1-flash:
+    provider: openrouter
+    upstream_model: deepseek/deepseek-v4.1-flash
+    reasoning: default
+  deepseek-low:
+    provider: openrouter
+    upstream_model: deepseek/deepseek-v4.1-flash
+    reasoning: low
+  deepseek-high:
+    provider: openrouter
+    upstream_model: deepseek/deepseek-v4.1-flash
+    reasoning: high
