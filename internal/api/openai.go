@@ -149,7 +149,7 @@ func (p *Public) chatCompletions(w http.ResponseWriter, r *http.Request) {
 	)
 
 	if in.Stream {
-		p.handleStream(w, r, start, reqID, resolved, inst, canon, sess, in.StreamOptions, log)
+		p.handleStream(w, r, start, reqID, resolved, inst, canon, sess, log)
 		return
 	}
 
@@ -179,7 +179,7 @@ func (p *Public) chatCompletions(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, out)
 }
 
-func (p *Public) handleStream(w http.ResponseWriter, r *http.Request, start time.Time, reqID string, resolved *model.Resolved, inst *plugin.Instance, canon *protocol.CompletionRequest, sess *trace.Session, opts *streamOptions, log *slog.Logger) {
+func (p *Public) handleStream(w http.ResponseWriter, r *http.Request, start time.Time, reqID string, resolved *model.Resolved, inst *plugin.Instance, canon *protocol.CompletionRequest, sess *trace.Session, log *slog.Logger) {
 	p.Metrics.ActiveStreams.Inc()
 	defer p.Metrics.ActiveStreams.Dec()
 
@@ -212,7 +212,6 @@ func (p *Public) handleStream(w http.ResponseWriter, r *http.Request, start time
 	flusher.Flush()
 	sess.StreamMeta("stream_started")
 
-	includeUsage := opts != nil && opts.IncludeUsage
 	created := time.Now().Unix()
 	first := true
 	var usage *protocol.Usage
@@ -290,9 +289,10 @@ func (p *Public) handleStream(w http.ResponseWriter, r *http.Request, start time
 			finish = "stop"
 		}
 		writeChunk(finalChunk(reqID, resolved.ClientModel, created, finish, nil))
-		// OpenAI stream_options.include_usage: a trailing chunk with empty
-		// choices and a usage object, immediately before data: [DONE].
-		if includeUsage && usage != nil {
+		// Trailing OpenAI usage chunk (empty choices), immediately before
+		// data: [DONE]. Cursor BYOK omits stream_options.include_usage, so
+		// emit whenever the plugin collected usage rather than gating on the flag.
+		if usage != nil {
 			writeChunk(usageChunk(reqID, resolved.ClientModel, created, openaiUsage(usage)))
 			inTok, outTok = usage.InputTokens, usage.OutputTokens
 		}

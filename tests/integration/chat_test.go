@@ -98,6 +98,42 @@ func TestChatStream(t *testing.T) {
 	}
 }
 
+func TestChatStreamUsageWithoutIncludeFlag(t *testing.T) {
+	public, _ := startMockAPI(t)
+	resp := postJSON(t, public+"/v1/chat/completions", []byte(`{"model":"mock","messages":[{"role":"user","content":"hi"}],"stream":true}`))
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		b, _ := io.ReadAll(resp.Body)
+		t.Fatalf("status %d %s", resp.StatusCode, b)
+	}
+	sc := bufio.NewScanner(resp.Body)
+	gotUsageChunk := false
+	for sc.Scan() {
+		line := sc.Text()
+		if !strings.HasPrefix(line, "data:") {
+			continue
+		}
+		data := strings.TrimSpace(strings.TrimPrefix(line, "data:"))
+		if data == "[DONE]" {
+			break
+		}
+		var obj map[string]any
+		if err := json.Unmarshal([]byte(data), &obj); err != nil {
+			continue
+		}
+		if _, ok := obj["usage"]; !ok {
+			continue
+		}
+		choices, _ := obj["choices"].([]any)
+		if len(choices) == 0 {
+			gotUsageChunk = true
+		}
+	}
+	if !gotUsageChunk {
+		t.Fatal("stream must emit trailing usage even without stream_options.include_usage")
+	}
+}
+
 func TestUnknownFields(t *testing.T) {
 	public, _ := startMockAPI(t)
 	raw, _ := os.ReadFile(filepath.Join(repoRoot(t), "tests/fixtures/cursor/cursor_unknown_fields.json"))
