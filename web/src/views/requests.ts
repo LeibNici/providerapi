@@ -1,5 +1,4 @@
 import { fetchRequests, type RequestRow } from "../api";
-import { whenDisconnected } from "../dispose";
 import { formatDuration, formatTime, statusClass } from "../format";
 
 export interface RequestsViewOpts {
@@ -89,25 +88,19 @@ export function createRequestsView(opts: RequestsViewOpts): HTMLElement {
     }
   }
 
-  function schedulePoll() {
-    if (pollTimer) window.clearInterval(pollTimer);
-    pollTimer = window.setInterval(() => {
-      if (document.visibilityState === "visible") refresh();
-    }, 2000);
-  }
-
   [idFilter, modelFilter, statusFilter, providerFilter].forEach((el) =>
     el.addEventListener("input", renderTable),
   );
 
   refresh();
-  schedulePoll();
-  whenDisconnected(root, () => {
-    if (pollTimer !== undefined) {
-      window.clearInterval(pollTimer);
+  pollTimer = window.setInterval(() => {
+    if (!root.isConnected) {
+      window.clearInterval(pollTimer!);
       pollTimer = undefined;
+      return;
     }
-  });
+    if (document.visibilityState === "visible") refresh();
+  }, 2000);
 
   return root;
 }

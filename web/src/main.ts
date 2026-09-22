@@ -8,7 +8,6 @@ import {
 import { createModelsView } from "./views/models";
 import { createPluginsView } from "./views/plugins";
 import { createRequestDetailView } from "./views/request-detail";
-import { whenDisconnected } from "./dispose";
 import { createRequestsView } from "./views/requests";
 
 const app = document.getElementById("app")!;
@@ -124,11 +123,15 @@ function renderShell(main: HTMLElement, active: string): void {
     }
   }
   refreshHealth();
-  shellHealthTimer = window.setInterval(refreshHealth, 5000);
-  whenDisconnected(shell, clearShellHealthTimer);
-
   shell.append(header, mainEl, footer);
   app.replaceChildren(shell);
+  shellHealthTimer = window.setInterval(() => {
+    if (!shell.isConnected) {
+      clearShellHealthTimer();
+      return;
+    }
+    void refreshHealth();
+  }, 5000);
 }
 
 async function render(): Promise<void> {
