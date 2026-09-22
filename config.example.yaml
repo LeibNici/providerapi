@@ -86,6 +86,7 @@ models:
     provider: openrouter
     upstream_model: deepseek/deepseek-v4.1-flash
     reasoning: default
+    context_length: 1000000
   deepseek-low:
     provider: openrouter
     upstream_model: deepseek/deepseek-v4.1-flash

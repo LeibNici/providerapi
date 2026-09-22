@@ -67,6 +67,7 @@ func TestChatStream(t *testing.T) {
 	sc := bufio.NewScanner(resp.Body)
 	gotDone := false
 	gotText := false
+	gotUsageChunk := false
 	for sc.Scan() {
 		line := sc.Text()
 		if strings.HasPrefix(line, "data:") {
@@ -78,10 +79,58 @@ func TestChatStream(t *testing.T) {
 			if strings.Contains(data, `"content"`) {
 				gotText = true
 			}
+			var obj map[string]any
+			if err := json.Unmarshal([]byte(data), &obj); err == nil {
+				if _, ok := obj["usage"]; ok {
+					choices, _ := obj["choices"].([]any)
+					if len(choices) == 0 {
+						gotUsageChunk = true
+					}
+				}
+			}
 		}
 	}
 	if !gotText || !gotDone {
 		t.Fatalf("stream incomplete text=%v done=%v", gotText, gotDone)
+	}
+	if !gotUsageChunk {
+		t.Fatal("include_usage stream must emit a trailing usage chunk with empty choices")
+	}
+}
+
+func TestChatStreamUsageWithoutIncludeFlag(t *testing.T) {
+	public, _ := startMockAPI(t)
+	resp := postJSON(t, public+"/v1/chat/completions", []byte(`{"model":"mock","messages":[{"role":"user","content":"hi"}],"stream":true}`))
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		b, _ := io.ReadAll(resp.Body)
+		t.Fatalf("status %d %s", resp.StatusCode, b)
+	}
+	sc := bufio.NewScanner(resp.Body)
+	gotUsageChunk := false
+	for sc.Scan() {
+		line := sc.Text()
+		if !strings.HasPrefix(line, "data:") {
+			continue
+		}
+		data := strings.TrimSpace(strings.TrimPrefix(line, "data:"))
+		if data == "[DONE]" {
+			break
+		}
+		var obj map[string]any
+		if err := json.Unmarshal([]byte(data), &obj); err != nil {
+			continue
+		}
+		if _, ok := obj["usage"]; !ok {
+			continue
+		}
+		choices, _ := obj["choices"].([]any)
+		if len(choices) == 0 {
+			gotUsageChunk = true
+		}
+	}
+	if !gotUsageChunk {
+		t.Fatal("stream must emit trailing usage even without stream_options.include_usage")
 	}
 }
 
@@ -181,6 +230,23 @@ func TestModelsHideUpstream(t *testing.T) {
 	b, _ := io.ReadAll(resp.Body)
 	if strings.Contains(string(b), "mock-echo") || strings.Contains(string(b), "anthropic/") {
 		t.Fatalf("upstream model leaked: %s", b)
+	}
+	var listed struct {
+		Data []struct {
+			ID            string `json:"id"`
+			ContextLength int    `json:"context_length"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(b, &listed); err != nil {
+		t.Fatal(err)
+	}
+	if len(listed.Data) == 0 {
+		t.Fatal("expected models")
+	}
+	for _, m := range listed.Data {
+		if m.ContextLength <= 0 {
+			t.Fatalf("model %s missing context_length: %+v", m.ID, m)
+		}
 	}
 }
 

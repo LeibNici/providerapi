@@ -149,7 +149,7 @@ func (p *Public) chatCompletions(w http.ResponseWriter, r *http.Request) {
 	)
 
 	if in.Stream {
-		p.handleStream(w, r, start, reqID, resolved, inst, canon, sess, in.StreamOptions, log)
+		p.handleStream(w, r, start, reqID, resolved, inst, canon, sess, log)
 		return
 	}
 
@@ -179,7 +179,7 @@ func (p *Public) chatCompletions(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, out)
 }
 
-func (p *Public) handleStream(w http.ResponseWriter, r *http.Request, start time.Time, reqID string, resolved *model.Resolved, inst *plugin.Instance, canon *protocol.CompletionRequest, sess *trace.Session, opts *streamOptions, log *slog.Logger) {
+func (p *Public) handleStream(w http.ResponseWriter, r *http.Request, start time.Time, reqID string, resolved *model.Resolved, inst *plugin.Instance, canon *protocol.CompletionRequest, sess *trace.Session, log *slog.Logger) {
 	p.Metrics.ActiveStreams.Inc()
 	defer p.Metrics.ActiveStreams.Dec()
 
@@ -212,7 +212,6 @@ func (p *Public) handleStream(w http.ResponseWriter, r *http.Request, start time
 	flusher.Flush()
 	sess.StreamMeta("stream_started")
 
-	includeUsage := opts != nil && opts.IncludeUsage
 	created := time.Now().Unix()
 	first := true
 	var usage *protocol.Usage
@@ -289,12 +288,14 @@ func (p *Public) handleStream(w http.ResponseWriter, r *http.Request, start time
 		if finish == "" {
 			finish = "stop"
 		}
-		var usageOut any
-		if includeUsage && usage != nil {
-			usageOut = openaiUsage(usage)
+		writeChunk(finalChunk(reqID, resolved.ClientModel, created, finish, nil))
+		// Trailing OpenAI usage chunk (empty choices), immediately before
+		// data: [DONE]. Cursor BYOK omits stream_options.include_usage, so
+		// emit whenever the plugin collected usage rather than gating on the flag.
+		if usage != nil {
+			writeChunk(usageChunk(reqID, resolved.ClientModel, created, openaiUsage(usage)))
 			inTok, outTok = usage.InputTokens, usage.OutputTokens
 		}
-		writeChunk(finalChunk(reqID, resolved.ClientModel, created, finish, usageOut))
 		_, _ = w.Write([]byte("data: [DONE]\n\n"))
 		flusher.Flush()
 		if usage != nil {
@@ -331,6 +332,17 @@ func finalChunk(id, model string, created int64, finish string, usage any) map[s
 		out["usage"] = usage
 	}
 	return out
+}
+
+func usageChunk(id, model string, created int64, usage any) map[string]any {
+	return map[string]any{
+		"id":      id,
+		"object":  "chat.completion.chunk",
+		"created": created,
+		"model":   model,
+		"choices": []any{},
+		"usage":   usage,
+	}
 }
 
 func toolCallDeltaJSON(d *protocol.ToolCallDelta) map[string]any {

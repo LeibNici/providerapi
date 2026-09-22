@@ -39,3 +39,24 @@ func TestResolvePriority(t *testing.T) {
 		t.Fatal("expected model not found")
 	}
 }
+
+func TestListAliasesContextLength(t *testing.T) {
+	cfg := &config.Config{
+		Models: map[string]config.ModelAlias{
+			"flash": {Provider: "openrouter", UpstreamModel: "deepseek/deepseek-v4.1-flash"},
+			"wide":  {Provider: "openrouter", UpstreamModel: "x", ContextLength: 128000},
+		},
+		Providers: map[string]config.ProviderInstance{"openrouter": {Plugin: "openai-compat"}},
+	}
+	got := ListAliases(cfg)
+	byID := map[string]protocol.ModelInfo{}
+	for _, m := range got {
+		byID[m.ID] = m
+	}
+	if byID["flash"].ContextLength != protocol.DefaultContextLength {
+		t.Fatalf("default context_length: %+v", byID["flash"])
+	}
+	if byID["wide"].ContextLength != 128000 {
+		t.Fatalf("explicit context_length: %+v", byID["wide"])
+	}
+}
