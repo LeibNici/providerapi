@@ -55,6 +55,8 @@ export OPENROUTER_API_KEY=...
 
    Upstream slug: `deepseek/deepseek-v4.1-flash`.
 
+`GET /v1/models` includes `context_length`. The default `1000000` is a Cursor compatibility fallback: the display default for an alias that does not set `context_length`. It is not a statement of model capability. Known models must set the real window, for example `context_length: 128000`.
+
 3. Inspect a request:
 
 ```bash

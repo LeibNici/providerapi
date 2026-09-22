@@ -6,9 +6,10 @@
 
 **Release hygiene:** module path, README, minimal CI, this doc only. Zero behavior change. The hygiene commit SHA is not the technical acceptance SHA.
 
-**Release baseline:** — fill only after this PR merges and the small RC passes. That later `main` SHA is what `v1.0.0` will point at. Leave it blank now.
+**Release SHAs** (code, not a claim that git tags were moved):
 
-`v1.0.0` **尚未作为正式 release tag**。
+- **v1.0.0** → [`57216615414782c87917eb23d23bbf94fe2c57a7`](https://github.com/LeibNici/providerapi/commit/57216615414782c87917eb23d23bbf94fe2c57a7) — original v1 release
+- **v1.0.1** → [`9ad292e541aee262f75c06e98e4f7075f28e664e`](https://github.com/LeibNici/providerapi/commit/9ad292e541aee262f75c06e98e4f7075f28e664e) — Cursor context-usage fix: trailing stream usage chunk, `/v1/models` `context_length`
 
 ## 证据
 
