@@ -2,9 +2,13 @@
 
 技术验收：**PASS**（2026-09-21，LeibNici）。
 
-技术基线：`main` [`ad7d3a2f8698fbc193d0db0c63a707d96025c5b2`](https://github.com/LeibNici/providerapi/commit/ad7d3a2f8698fbc193d0db0c63a707d96025c5b2)
+**Technical acceptance baseline:** [`ad7d3a2f8698fbc193d0db0c63a707d96025c5b2`](https://github.com/LeibNici/providerapi/commit/ad7d3a2f8698fbc193d0db0c63a707d96025c5b2) — v1 behavior already accepted. This SHA does not move.
 
-`v1.0.0` **尚未作为正式 release tag**。module path 与 README 要先做 Release Hygiene；合并并做一次小回归后，新的 `main` SHA 才是 release baseline，再打 `v1.0.0`。
+**Release hygiene:** module path, README, minimal CI, this doc only. Zero behavior change. The hygiene commit SHA is not the technical acceptance SHA.
+
+**Release baseline:** — fill only after this PR merges and the small RC passes. That later `main` SHA is what `v1.0.0` will point at. Leave it blank now.
+
+`v1.0.0` **尚未作为正式 release tag**。
 
 ## 证据
 
@@ -25,7 +29,7 @@
 
 OpenRouter 瞬时 502（`req_fd2f35fd8ba1563d`，随后恢复，未挂死）不构成验收失败。
 
-细节：[OpenRouter smoke](openrouter-smoke.md)。代码：[v1 P0 PR](https://github.com/LeibNici/providerapi/pull/1)、[v1 P1 PR](https://github.com/LeibNici/providerapi/pull/2)。
+代码：[v1 P0 PR](https://github.com/LeibNici/providerapi/pull/1)、[v1 P1 PR](https://github.com/LeibNici/providerapi/pull/2)。
 
 ## 冻结，不算 v1 缺陷
 
