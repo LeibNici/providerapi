@@ -26,15 +26,17 @@ type Admin struct {
 
 func (a *Admin) Routes() http.Handler {
 	r := chi.NewRouter()
-	r.Use(a.auth)
-	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	r.Group(func(r chi.Router) {
+		r.Use(a.auth)
+		r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
+			writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+		})
+		r.Get("/admin/requests", a.listRequests)
+		r.Get("/admin/requests/{id}", a.getRequest)
+		r.Get("/admin/plugins", a.listPlugins)
+		r.Get("/admin/models", a.listModels)
+		r.Handle("/metrics", promhttp.HandlerFor(a.Metrics.Registry, promhttp.HandlerOpts{}))
 	})
-	r.Get("/admin/requests", a.listRequests)
-	r.Get("/admin/requests/{id}", a.getRequest)
-	r.Get("/admin/plugins", a.listPlugins)
-	r.Get("/admin/models", a.listModels)
-	r.Handle("/metrics", promhttp.HandlerFor(a.Metrics.Registry, promhttp.HandlerOpts{}))
 	r.Mount("/", console.Handler())
 	return r
 }

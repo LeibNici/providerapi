@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -138,5 +139,45 @@ func TestAdminRequestDetailMetadataNoPrompt(t *testing.T) {
 		if strings.Contains(string(e.Payload), prompt) {
 			t.Fatalf("event leaked prompt: %s", e.Payload)
 		}
+	}
+}
+
+func TestConsoleServedWithoutTokenAdminAPIProtected(t *testing.T) {
+	cfg := &config.Config{
+		Admin: config.AdminConfig{Token: "secret-token"},
+	}
+	adm := &Admin{Cfg: cfg, Plugins: plugin.NewManager(cfg), Metrics: observability.New()}
+	h := adm.Routes()
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("console / status %d body %s", rec.Code, rec.Body.String())
+	}
+	html := rec.Body.String()
+	if !strings.Contains(html, "<html") {
+		t.Fatalf("expected HTML console: %s", html)
+	}
+	re := regexp.MustCompile(`src="(/assets/[^"]+\.js)"`)
+	m := re.FindStringSubmatch(html)
+	if m == nil {
+		t.Fatal("console index missing JS asset reference")
+	}
+	reqJS := httptest.NewRequest(http.MethodGet, m[1], nil)
+	recJS := httptest.NewRecorder()
+	h.ServeHTTP(recJS, reqJS)
+	if recJS.Code != http.StatusOK {
+		t.Fatalf("console JS status %d", recJS.Code)
+	}
+	if len(recJS.Body.Bytes()) == 0 {
+		t.Fatal("empty console JS response")
+	}
+
+	reqAPI := httptest.NewRequest(http.MethodGet, "/admin/requests", nil)
+	recAPI := httptest.NewRecorder()
+	h.ServeHTTP(recAPI, reqAPI)
+	if recAPI.Code != http.StatusUnauthorized {
+		t.Fatalf("admin requests without token: status %d", recAPI.Code)
 	}
 }

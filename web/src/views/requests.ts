@@ -1,4 +1,5 @@
 import { fetchRequests, type RequestRow } from "../api";
+import { whenDisconnected } from "../dispose";
 import { formatDuration, formatTime, statusClass } from "../format";
 
 export interface RequestsViewOpts {
@@ -101,6 +102,12 @@ export function createRequestsView(opts: RequestsViewOpts): HTMLElement {
 
   refresh();
   schedulePoll();
+  whenDisconnected(root, () => {
+    if (pollTimer !== undefined) {
+      window.clearInterval(pollTimer);
+      pollTimer = undefined;
+    }
+  });
 
   return root;
 }

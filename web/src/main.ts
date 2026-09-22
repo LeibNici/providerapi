@@ -8,10 +8,12 @@ import {
 import { createModelsView } from "./views/models";
 import { createPluginsView } from "./views/plugins";
 import { createRequestDetailView } from "./views/request-detail";
+import { whenDisconnected } from "./dispose";
 import { createRequestsView } from "./views/requests";
 
 const app = document.getElementById("app")!;
 let needsToken = false;
+let shellHealthTimer: number | undefined;
 
 function parseRoute(): { page: "requests" | "models" | "plugins" | "detail"; id?: string } {
   const path = location.pathname.replace(/\/+$/, "") || "/";
@@ -28,6 +30,7 @@ function navigate(path: string) {
 }
 
 function renderTokenGate(): void {
+  clearShellHealthTimer();
   app.replaceChildren();
   const gate = document.createElement("div");
   gate.className = "token-gate panel";
@@ -60,7 +63,15 @@ function renderTokenGate(): void {
   app.append(gate);
 }
 
+function clearShellHealthTimer(): void {
+  if (shellHealthTimer !== undefined) {
+    window.clearInterval(shellHealthTimer);
+    shellHealthTimer = undefined;
+  }
+}
+
 function renderShell(main: HTMLElement, active: string): void {
+  clearShellHealthTimer();
   const shell = document.createElement("div");
   shell.className = "shell";
 
@@ -113,7 +124,8 @@ function renderShell(main: HTMLElement, active: string): void {
     }
   }
   refreshHealth();
-  window.setInterval(refreshHealth, 5000);
+  shellHealthTimer = window.setInterval(refreshHealth, 5000);
+  whenDisconnected(shell, clearShellHealthTimer);
 
   shell.append(header, mainEl, footer);
   app.replaceChildren(shell);
